@@ -39,22 +39,44 @@ app.get('/api/geo', (req, res) => {
 });
 
 app.get('/api/listings', async (req, res) => {
-  const { q } = req.query;
-  const result = q 
-    ? await client.execute({ sql: 'SELECT * FROM listings WHERE title LIKE ? OR description LIKE ?', args: [`%${q}%`, `%${q}%`] })
-    : await client.execute('SELECT * FROM listings ORDER BY createdAt DESC');
-  res.json(result.rows.map((l: any) => ({ ...l, isDigital: !!l.isDigital, allowBidding: !!l.allowBidding, allowCustomOrder: !!l.allowCustomOrder })));
+  try {
+    const result = await client.execute('SELECT * FROM listings ORDER BY createdAt DESC');
+    res.json(result.rows.map((l: any) => ({
+      ...l,
+      isDigital: !!l.isDigital,
+      allowBidding: !!l.allowBidding,
+      allowCustomOrder: !!l.allowCustomOrder
+    })));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.post('/api/listings', async (req, res) => {
-  const listing = req.body;
-  await client.execute({
-    sql: `INSERT OR REPLACE INTO listings (id, title, description, price, imageUrl, seller, createdAt, category, isDigital, downloadUrl, allowBidding, allowCustomOrder) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [listing.id, listing.title, listing.description, listing.price, listing.imageUrl, listing.seller, listing.createdAt, listing.category, listing.isDigital ? 1 : 0, listing.downloadUrl, listing.allowBidding ? 1 : 0, listing.allowCustomOrder ? 1 : 0]
-  });
-  res.json({ success: true });
+  try {
+    const listing = req.body;
+    console.log("Saving listing:", listing.id);
+    
+    // INSERT OR REPLACE를 사용하여 업데이트와 삽입을 동시에 처리
+    await client.execute({
+      sql: `INSERT OR REPLACE INTO listings (
+        id, title, description, price, imageUrl, seller, createdAt, category, 
+        isDigital, downloadUrl, allowBidding, allowCustomOrder
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        listing.id, listing.title, listing.description, listing.price, 
+        listing.imageUrl, listing.seller, listing.createdAt, listing.category, 
+        listing.isDigital ? 1 : 0, listing.downloadUrl, 
+        listing.allowBidding ? 1 : 0, listing.allowCustomOrder ? 1 : 0
+      ]
+    });
+    
+    res.status(200).json({ success: true });
+  } catch (error: any) {
+    console.error("Turso Save Error:", error);
+    res.status(500).json({ error: error.message });
+  }
 });
-
 app.get('/api/profiles/:address', async (req, res) => {
   const profileResult = await client.execute({ sql: 'SELECT * FROM profiles WHERE address = ?', args: [req.params.address] });
   const profile = profileResult.rows[0];
@@ -68,12 +90,21 @@ app.get('/api/profiles/:address', async (req, res) => {
 });
 
 app.post('/api/profiles', async (req, res) => {
-  const p = req.body;
-  await client.execute({
-    sql: `INSERT OR REPLACE INTO profiles (address, ympBalance, lastLoginDate, loginStreak, gamesCompletedToday, role, nickname, avatarUrl) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [p.address, p.ympBalance, p.lastLoginDate, p.loginStreak, JSON.stringify(p.gamesCompletedToday), p.role, p.nickname, p.avatarUrl]
-  });
-  res.json({ success: true });
+  try {
+    const p = req.body;
+    await client.execute({
+      sql: `INSERT OR REPLACE INTO profiles (
+        address, ympBalance, lastLoginDate, loginStreak, gamesCompletedToday, role, nickname, avatarUrl
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        p.address, p.ympBalance, p.lastLoginDate, p.loginStreak, 
+        JSON.stringify(p.gamesCompletedToday || {}), p.role, p.nickname, p.avatarUrl
+      ]
+    });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // 알림 및 기타 기능
