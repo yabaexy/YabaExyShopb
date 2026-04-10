@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-primary: #D4AF37; /* Gold */
+  --color-ink: #2C1E12; /* Dark Wood */
+  --color-bg: #F5E6D3; /* Light Wood/Cream */
+  --color-line: #8B4513; /* Saddle Brown */
+}
+
+@layer base {
+  body {
+    @apply bg-bg text-ink font-sans antialiased;
+    background-image: url("https://www.transparenttextures.com/patterns/wood-pattern.png");
+    background-color: #F5E6D3;
+  }
+}
+
+.data-row {
+  @apply grid grid-cols-[40px_1.5fr_1fr_1fr] p-4 border-b border-line transition-colors cursor-pointer;
+}
+
+.data-row:hover {
+  @apply bg-ink text-bg;
+}
+
+.col-header {
+  @apply font-serif italic text-[11px] opacity-50 uppercase tracking-widest;
+}
+
+.data-value {
+  @apply font-mono tracking-tight;
+}
