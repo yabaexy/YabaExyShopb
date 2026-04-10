@@ -114,6 +114,8 @@ async function initDb() {
 async function startServer() {
   await initDb();
   const app = express();
+  app.use(cors()); // 모든 도메인에서의 요청을 허용 (지갑/AI Studio 연동 필수)
+  app.use(express.json());
   const PORT = 3000;
 
   app.use(express.json());
