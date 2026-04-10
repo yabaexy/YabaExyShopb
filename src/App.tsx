@@ -173,8 +173,7 @@ export default function App() {
     try {
       const res = await fetch('/api/admin/escrow');
       const data = await res.json();
-
-      setListings(Array.isArray(data) ? data : data.listings || []);
+      setEscrowRecords(data);
     } catch (e) {
       console.error('Error fetching escrow records:', e);
     }
@@ -347,16 +346,10 @@ export default function App() {
 
   const updateProfileOnServer = async (newProfile: UserProfile) => {
     await fetch('/api/profiles', {
-     method: 'POST',
-     headers: { 'Content-Type': 'application/json' },
-     body: JSON.stringify({
-     address: newProfile.address,
-     ympBalance: newProfile.ympBalance,
-     loginStreak: newProfile.loginStreak,
-     lastLoginDate: newProfile.lastLoginDate,
-     role: newProfile.role,
-  }),
-});
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newProfile)
+    });
   };
 
   const updateProfile = async (newProfile: UserProfile) => {
@@ -519,7 +512,7 @@ export default function App() {
       await fetch('/api/purchases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newPurchase),
+        body: JSON.stringify({ purchase: newPurchase, buyerAddress: wallet.address })
       });
 
       await fetchListings();
@@ -548,22 +541,15 @@ export default function App() {
     }
   };
 
-const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const res = await fetch('/api/upload', {
-    method: 'POST',
-    body: formData,
-  });
-
-  const data = await res.json();
-
-  setUploadedImage(data.url); // Blob URL 저장
-};
+  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploadedImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleAddListing = async (e: FormEvent<HTMLFormElement>) => {
@@ -1541,6 +1527,17 @@ const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
                       <span className="text-xs font-bold uppercase">Unwrap</span>
                     </a>
                   </div>
+
+                  <a 
+                    href="https://x.com/YadaLoverz26/status/2013970257140953561"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-center gap-2 p-4 bg-primary/5 border border-primary/20 rounded-2xl hover:bg-primary/10 transition-colors group"
+                  >
+                    <FileCode className="w-5 h-5 text-primary" />
+                    <span className="text-xs font-bold uppercase tracking-widest">How to Unwrap (Guide)</span>
+                    <ExternalLink className="w-3 h-3 opacity-40 group-hover:translate-x-1 transition-transform" />
+                  </a>
 
                   {userCountry === 'KR' && (
                     <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl flex items-start gap-3">

@@ -10,9 +10,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const client = createClient({
-  url: 'file:exyon.db',
+  // Vercel이 자동으로 넣어주는 환경 변수 이름을 사용합니다. 
+  // 보통 TURSO_DATABASE_URL 또는 LIBSQL_URL 같은 이름입니다.
+  url: process.env.libsql://database-bistre-garden-vercel-icfg-kqt2ce1zvk7qrfygbdevgcfg.aws-ap-northeast-1.turso.io || process.env.LIBSQL_URL || 'file:exyon.db',
+  authToken: process.env.eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3NzU2NTQ1NzEsImlkIjoiMDE5ZDZkNDItOGQwMS03ZmVkLWEzYjgtZDQ1NGRjZGU1OTczIiwicmlkIjoiOTg5MzY4MDQtMzRjNS00ZGFiLTg5ZTEtODBjMDg5YTg0Y2MxIn0.tCxaxRdnR6ECXTZSQqvJShEjzfYrr9llqOHr7kxMtAs3i8bfH0BX8JHhEO-6eScEOnxtFU4Heqs4s_rjWxSVDA || process.env.LIBSQL_AUTH_TOKEN,
 });
-
 // Initialize Database
 async function initDb() {
   await client.execute(`
@@ -470,9 +472,15 @@ async function startServer() {
     });
   }
 
+// 로컬 테스트 환경(내 컴퓨터)에서만 listen이 실행되도록 조건문을 겁니다.
+if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
+}
+
+// ⭐️ 가장 중요한 추가 사항: Vercel이 이 Express 설정을 가져다 쓸 수 있게 내보냅니다.
+export default app;
 }
 
 startServer();
