@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { createClient } from '@libsql/client';
 import geoip from 'geoip-lite';
 import requestIp from 'request-ip';
+import cors from 'cors';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -481,6 +482,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 // ⭐️ 가장 중요한 추가 사항: Vercel이 이 Express 설정을 가져다 쓸 수 있게 내보냅니다.
 export default app;
+app.use(cors());
 }
 
 startServer();
