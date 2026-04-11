@@ -64,10 +64,18 @@ app.post('/api/listings', async (req, res) => {
         isDigital, downloadUrl, allowBidding, allowCustomOrder
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
-        listing.id, listing.title, listing.description, listing.price, 
-        listing.imageUrl, listing.seller, listing.createdAt, listing.category, 
-        listing.isDigital ? 1 : 0, listing.downloadUrl, 
-        listing.allowBidding ? 1 : 0, listing.allowCustomOrder ? 1 : 0
+        listing.id, 
+        listing.title, 
+        listing.description, 
+        listing.price, 
+        listing.imageUrl, 
+        listing.seller, 
+        listing.createdAt, 
+        listing.category, 
+        listing.isDigital ? 1 : 0, 
+        listing.downloadUrl, 
+        listing.allowBidding ? 1 : 0, 
+        listing.allowCustomOrder ? 1 : 0
       ]
     });
     
@@ -78,14 +86,25 @@ app.post('/api/listings', async (req, res) => {
   }
 });
 app.get('/api/profiles/:address', async (req, res) => {
-  const profileResult = await client.execute({ sql: 'SELECT * FROM profiles WHERE address = ?', args: [req.params.address] });
-  const profile = profileResult.rows[0];
-  if (profile) {
-    const wishlist = await client.execute({ sql: 'SELECT listingId FROM wishlist WHERE address = ?', args: [req.params.address] });
-    const purchases = await client.execute({ sql: 'SELECT * FROM purchases WHERE buyerAddress = ?', args: [req.params.address] });
-    res.json({ ...profile, gamesCompletedToday: JSON.parse((profile.gamesCompletedToday as string) || '{}'), wishlist: wishlist.rows.map((r: any) => r.listingId), purchases: purchases.rows });
-  } else {
-    res.status(404).json({ error: 'Not found' });
+  try {
+    const address = req.params.address;
+    const result = await client.execute({
+      sql: 'SELECT * FROM profiles WHERE address = ?',
+      args: [address]
+    });
+    
+    const profile = result.rows[0];
+    if (profile) {
+      // DB에 저장된 문자열 형태의 JSON을 다시 객체로 변환해서 보냅니다.
+      res.json({
+        ...profile,
+        gamesCompletedToday: JSON.parse((profile.gamesCompletedToday as string) || '{}')
+      });
+    } else {
+      res.status(404).json({ error: "Profile not found" });
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -109,14 +128,42 @@ app.post('/api/profiles', async (req, res) => {
 
 // 알림 및 기타 기능
 app.get('/api/notifications/:address', async (req, res) => {
-  const result = await client.execute({ sql: 'SELECT * FROM notifications WHERE recipientAddress = ? ORDER BY timestamp DESC LIMIT 50', args: [req.params.address] });
-  res.json(result.rows.map((n: any) => ({ ...n, isRead: !!n.isRead })));
+  try {
+    const result = await client.execute({
+      sql: 'SELECT * FROM notifications WHERE recipientAddress = ? ORDER BY timestamp DESC LIMIT 50',
+      args: [req.params.address]
+    });
+    // isRead(0 or 1)를 불리언(true/false)으로 변환하여 전달
+    res.json(result.rows.map((n: any) => ({ ...n, isRead: !!n.isRead })));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
-
 app.post('/api/comments', async (req, res) => {
-  const c = req.body;
-  await client.execute({ sql: 'INSERT INTO comments (id, listingId, authorAddress, text, timestamp) VALUES (?, ?, ?, ?, ?)', args: [c.id, c.listingId, c.authorAddress, c.text, c.timestamp] });
-  res.json({ success: true });
+  try {
+    const { id, listingId, authorAddress, text, timestamp, sellerAddress } = req.body;
+    
+    // 1. 댓글 저장
+    await client.execute({
+      sql: 'INSERT INTO comments (id, listingId, authorAddress, text, timestamp) VALUES (?, ?, ?, ?, ?)',
+      args: [id, listingId, authorAddress, text, timestamp]
+    });
+
+    // 2. 판매자에게 알림 생성 (헬퍼 함수 createNotification 활용)
+    if (sellerAddress) {
+      await createNotification(
+        sellerAddress, 
+        authorAddress, 
+        'comment', 
+        `새로운 댓글이 달렸습니다: ${text.substring(0, 20)}...`, 
+        listingId
+      );
+    }
+    
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // [4] 정적 파일 제공 (프로덕션 환경 전용)
