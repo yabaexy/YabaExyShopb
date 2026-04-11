@@ -4,6 +4,7 @@ import requestIp from 'request-ip';
 import cors from 'cors';
 import geoip from 'geoip-lite';
 import path from 'path';
+import { put } from '@vercel/blob'; // [추가] Blob 업로드 함수
 
 // [1] DB 클라이언트 설정 - 직접 주소를 문자열로 입력하여 오타 방지
 const client = createClient({
@@ -15,7 +16,8 @@ const app = express();
 
 // [2] 미들웨어 설정 (Vercel 최적화: 함수 밖에서 즉시 적용)
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(requestIp.mw());
 
 const BLOCKED_COUNTRIES = ['CN', 'RU', 'BY', 'CU', 'HK', 'MO', 'KP', 'IR'];
@@ -55,33 +57,32 @@ app.get('/api/listings', async (req, res) => {
 app.post('/api/listings', async (req, res) => {
   try {
     const listing = req.body;
-    console.log("Saving listing:", listing.id);
-    
-    // INSERT OR REPLACE를 사용하여 업데이트와 삽입을 동시에 처리
+    let finalImageUrl = listing.imageUrl;
+
+    // 만약 이미지 데이터가 Base64(data:image/...) 형태로 왔다면 Blob에 저장
+    if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
+      const blob = await put(`listings/${listing.id}.png`, Buffer.from(finalImageUrl.split(',')[1], 'base64'), {
+        access: 'public', // [중요] 누구나 볼 수 있게 공개 설정
+      });
+      finalImageUrl = blob.url; // Turso에는 Blob URL 저장
+    }
+
     await client.execute({
       sql: `INSERT OR REPLACE INTO listings (
         id, title, description, price, imageUrl, seller, createdAt, category, 
         isDigital, downloadUrl, allowBidding, allowCustomOrder
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
-        listing.id, 
-        listing.title, 
-        listing.description, 
-        listing.price, 
-        listing.imageUrl, 
-        listing.seller, 
-        listing.createdAt, 
-        listing.category, 
-        listing.isDigital ? 1 : 0, 
-        listing.downloadUrl, 
-        listing.allowBidding ? 1 : 0, 
-        listing.allowCustomOrder ? 1 : 0
+        listing.id, listing.title, listing.description, listing.price, 
+        finalImageUrl, // 변환된 URL 사용
+        listing.seller, listing.createdAt, listing.category, 
+        listing.isDigital ? 1 : 0, listing.downloadUrl, 
+        listing.allowBidding ? 1 : 0, listing.allowCustomOrder ? 1 : 0
       ]
     });
-    
-    res.status(200).json({ success: true });
+    res.json({ success: true, imageUrl: finalImageUrl });
   } catch (error: any) {
-    console.error("Turso Save Error:", error);
+    console.error("Listing Save Error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -111,21 +112,31 @@ app.get('/api/profiles/:address', async (req, res) => {
 app.post('/api/profiles', async (req, res) => {
   try {
     const p = req.body;
+    let finalAvatarUrl = p.avatarUrl;
+
+    // 아바타 이미지가 Base64인 경우 처리
+    if (finalAvatarUrl && finalAvatarUrl.startsWith('data:image')) {
+      const blob = await put(`profiles/${p.address}.png`, Buffer.from(finalAvatarUrl.split(',')[1], 'base64'), {
+        access: 'public', // [중요] 공개 설정
+      });
+      finalAvatarUrl = blob.url;
+    }
+
     await client.execute({
       sql: `INSERT OR REPLACE INTO profiles (
         address, ympBalance, lastLoginDate, loginStreak, gamesCompletedToday, role, nickname, avatarUrl
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         p.address, p.ympBalance, p.lastLoginDate, p.loginStreak, 
-        JSON.stringify(p.gamesCompletedToday || {}), p.role, p.nickname, p.avatarUrl
+        JSON.stringify(p.gamesCompletedToday || {}), p.role, p.nickname, 
+        finalAvatarUrl // 변환된 URL 사용
       ]
     });
-    res.json({ success: true });
+    res.json({ success: true, avatarUrl: finalAvatarUrl });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
-
 // 알림 및 기타 기능
 app.get('/api/notifications/:address', async (req, res) => {
   try {
