@@ -61,8 +61,8 @@ app.post('/api/listings', async (req, res) => {
 
     // 만약 이미지 데이터가 Base64(data:image/...) 형태로 왔다면 Blob에 저장
     if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
-      const blob = await put(`listings/${listing.id}.png`, buffer, {
-      access: 'public', 
+      const blob = await put(`listings/${listing.id}.png`, Buffer.from(finalImageUrl.split(',')[1], 'base64'), {
+      access: 'public',
       addRandomSuffix: true,
      });
       finalImageUrl = blob.url; // Turso에는 Blob URL 저장
